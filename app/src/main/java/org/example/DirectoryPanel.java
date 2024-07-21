@@ -1,67 +1,133 @@
 package app.src.main.java.org.example;
 
 import javax.swing.*;
-import javax.swing.tree.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
 
-public class DirectoryPanel {
+public class DirectoryPanel extends JPanel {
 
-    private static JPanel panel;
+    private JList<File> fileList;
+    private DefaultListModel<File> listModel;
+    private File currentDirectory;
+    private FileSelectionListener fileSelectionListener;
 
-    public static JPanel createDirectoryPanel(MainFrame mainFrame) {
-        panel = new JPanel(new BorderLayout());
-        panel.setBackground(Color.BLACK);
-        panel.setPreferredSize(new Dimension(200, 600)); // Set preferred size
+    public DirectoryPanel(FileSelectionListener fileSelectionListener) {
+        this.fileSelectionListener = fileSelectionListener;
+        setLayout(new BorderLayout());
 
-        // Initialize the JTree to display the directory structure
-        File rootDirectory = new File(System.getProperty("user.dir"));
-        DefaultMutableTreeNode rootNode = createNodes(rootDirectory);
+        listModel = new DefaultListModel<>();
+        fileList = new JList<>(listModel);
+        fileList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        fileList.setFocusable(true);
 
+        // Set colors for JList
+        fileList.setBackground(Color.BLACK);
+        fileList.setForeground(Color.WHITE);
 
-        // Create components for file operations
-        JPanel buttonPanel = new JPanel(new GridLayout(1, 2));
-        buttonPanel.setBackground(Color.BLACK);
+        fileList.setCellRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                Component cell = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                File file = (File) value;
+                String displayName = file.getName(); // Display only the name
+                setText(displayName);
 
-        JButton openButton = new JButton("Open File");
-        openButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                mainFrame.openFile();
+                // Set background and foreground colors
+                cell.setBackground(isSelected ? Color.DARK_GRAY : Color.BLACK);
+                cell.setForeground(isSelected ? Color.WHITE : Color.LIGHT_GRAY);
+
+                return cell;
             }
         });
 
-        JButton saveButton = new JButton("Save File");
-        saveButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                mainFrame.saveFile(); // Delegate saving file to MainFrame
+        JScrollPane scrollPane = new JScrollPane(fileList);
+        scrollPane.getViewport().setBackground(Color.BLACK);
+        scrollPane.setBackground(Color.BLACK);
+        add(scrollPane, BorderLayout.CENTER);
+
+        // Set initial directory
+        currentDirectory = new File(System.getProperty("user.home"));
+        loadDirectory(currentDirectory);
+
+        // Mouse listener for double-click actions
+        fileList.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) { // Double-click
+                    openSelectedFile();
+                }
             }
         });
 
-        // Add buttons to the button panel
-        buttonPanel.add(openButton);
-        buttonPanel.add(saveButton);
+        // Key listener for Enter key actions
+        fileList.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    openSelectedFile();
+                }
+            }
+        });
 
-        // Add button panel to the bottom of the left panel
-        panel.add(buttonPanel, BorderLayout.SOUTH);
-
-        return panel;
+        // Focus the list on component showing
+        fileList.setSelectedIndex(0); // Default selection to the first item
     }
 
-    private static DefaultMutableTreeNode createNodes(File directory) {
-        DefaultMutableTreeNode node = new DefaultMutableTreeNode(directory.getName());
-        File[] files = directory.listFiles();
-
-        if (files != null) {
-            for (File file : files) {
-                if (file.isDirectory()) {
-                    node.add(createNodes(file));
+    private void openSelectedFile() {
+        File selectedFile = fileList.getSelectedValue();
+        if (selectedFile != null) {
+            if (selectedFile.isDirectory()) {
+                if (selectedFile.getName().equals("..")) {
+                    navigateUp();
                 } else {
-                    node.add(new DefaultMutableTreeNode(file.getName()));
+                    navigateTo(selectedFile);
+                }
+            } else {
+                // Notify the listener to open the file in CodeTextArea
+                if (fileSelectionListener != null) {
+                    fileSelectionListener.onFileSelected(selectedFile);
                 }
             }
         }
+    }
 
-        return node;
+    private void loadDirectory(File directory) {
+        currentDirectory = directory;
+        listModel.clear();
+
+        // Add ".." to navigate up if not in root directory
+        if (currentDirectory.getParentFile() != null) {
+            listModel.addElement(new File(".."));
+        }
+
+        File[] files = directory.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                listModel.addElement(file);
+            }
+        }
+    }
+
+    private void navigateTo(File directory) {
+        if (directory.isDirectory()) {
+            loadDirectory(directory);
+        }
+    }
+
+    private void navigateUp() {
+        File parentDirectory = currentDirectory.getParentFile();
+        if (parentDirectory != null) {
+            loadDirectory(parentDirectory);
+        }
+    }
+
+    public JList<File> getFileList() {
+        return fileList;
+    }
+
+    // Interface for file selection listener
+    public interface FileSelectionListener {
+        void onFileSelected(File file);
     }
 }

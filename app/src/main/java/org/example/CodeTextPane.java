@@ -2,30 +2,37 @@ package app.src.main.java.org.example;
 
 import javax.swing.*;
 import javax.swing.text.*;
-import javax.swing.event.*;
 import java.awt.*;
-import javax.swing.undo.UndoManager;
 import java.awt.event.*;
+import javax.swing.undo.UndoManager;
 import java.io.File;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 
-public class CodeTextArea extends JTextArea {
+public class CodeTextPane extends JTextPane {
 
-    private static final int TAB_SIZE = 4;
+    private static final int TAB_SIZE = 8;
     private UndoManager undoManager;
     private File file; // Variable to store the associated file
 
-    public CodeTextArea() {
+    public CodeTextPane() {
         super();
-        setBackground(new Color(0x01031a));
+        setBackground(new Color(0x01118a));
         setForeground(Color.WHITE);
         setFont(new Font("Menlo", Font.PLAIN, 16));
         setCaretColor(Color.WHITE);
-        
-        setTabSize(TAB_SIZE);
-
-        // Initialize the UndoManager
+        setMargin(new Insets(0, 8, 0, 0));
         undoManager = new UndoManager();
         getDocument().addUndoableEditListener(undoManager);
+
+        // Set up the default style
+        StyledDocument doc = getStyledDocument();
+        Style style = doc.addStyle("defaultStyle", null);
+        StyleConstants.setFontFamily(style, "Menlo");
+        StyleConstants.setFontSize(style, 16);
+        StyleConstants.setForeground(style, Color.WHITE);
+        StyleConstants.setBackground(style, new Color(0x01118a));
+        doc.setCharacterAttributes(0, doc.getLength(), style, false);
 
         addKeyListener(new KeyAdapter() {
             @Override
@@ -62,11 +69,43 @@ public class CodeTextArea extends JTextArea {
                 }
             }
         });
+        getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                SyntaxHighlighter.highlightAll(CodeTextPane.this);
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                SyntaxHighlighter.highlightAll(CodeTextPane.this);
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                // For styled documents, this method is not used
+            }
+        });
     }
 
-    @Override
-    public int getTabSize() {
-        return TAB_SIZE;
+    public void setCustomTabSize(int tabSize) {
+        // Obtain the StyledDocument
+        StyledDocument doc = getStyledDocument();
+        SimpleAttributeSet attrs = new SimpleAttributeSet();
+        // Create or get the existing style
+        Style style = doc.getStyle(StyleContext.DEFAULT_STYLE);
+        if (style == null) {
+            style = doc.addStyle(StyleContext.DEFAULT_STYLE, null);
+        }
+
+        // Create a new TabSet with a TabStop for the desired tab size
+        TabStop[] tabStops = new TabStop[] { new TabStop(tabSize) };
+        TabSet tabSet = new TabSet(tabStops);
+        
+        // Apply the TabSet to the style
+        StyleConstants.setTabSet(style, tabSet);
+        
+        // Apply the style to the entire document
+        doc.setParagraphAttributes(0, doc.getLength(), style, false);
     }
 
     public void setTextContent(String text) {
@@ -87,7 +126,7 @@ public class CodeTextArea extends JTextArea {
 
     private void handleAutoPairing(KeyEvent e) {
         char typedChar = e.getKeyChar();
-        
+
         switch (typedChar) {
             case '(':
                 insertPair(')');
@@ -109,8 +148,8 @@ public class CodeTextArea extends JTextArea {
 
     private void insertPair(char closingChar) {
         int caretPosition = getCaretPosition();
-        Document doc = getDocument();
-        
+        StyledDocument doc = getStyledDocument();
+
         try {
             doc.insertString(caretPosition, Character.toString(closingChar), null);
             setCaretPosition(caretPosition);
@@ -120,8 +159,8 @@ public class CodeTextArea extends JTextArea {
     }
 
     private void handleEnterKey() {
-        Document doc = getDocument();
-    
+        StyledDocument doc = getStyledDocument();
+
         if (isBetweenPairs(getCaretPosition())) {
             try {
                 int indentLevel = getStartOfLineAbove(getCaretPosition());
@@ -146,7 +185,7 @@ public class CodeTextArea extends JTextArea {
                 StringBuilder indentation = new StringBuilder();
                 for (int i = 0; i < TAB_SIZE * indentLevel; i++) {
                     indentation.append(' ');
-                }    
+                }
                 doc.insertString(getCaretPosition(), indentation.toString(), null);
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -156,7 +195,7 @@ public class CodeTextArea extends JTextArea {
 
     private boolean isBetweenPairs(int caretPosition) {
         if (caretPosition < 2) return false;
-        Document doc = getDocument();
+        StyledDocument doc = getStyledDocument();
         String textBefore = "";
         caretPosition -= 2;
         try {
@@ -166,13 +205,12 @@ public class CodeTextArea extends JTextArea {
         } catch (BadLocationException e) {
             e.printStackTrace();
         }
-        // something to fix later
         return textBefore.equals("(") || textBefore.equals("[") || textBefore.equals("{");
     }
 
     private int getStartOfLineAbove(int caretPosition) {
         try {
-            int lineIndex = this.getLineOfOffset(caretPosition);
+            int lineIndex = getStyledDocument().getDefaultRootElement().getElementIndex(caretPosition);
             if (--lineIndex >= 0) {
                 String currentLine = getTextAtLine(lineIndex);
                 int indentLevel = 0;
@@ -181,24 +219,24 @@ public class CodeTextArea extends JTextArea {
                     else if (currentLine.charAt(i) == ' ') indentLevel += 1;
                     else break;
                 }
-                return indentLevel / 4;
+                return indentLevel / TAB_SIZE;
             }
         } catch (Exception e) {};    
         return 0;
     }
 
     private String getTextAtLine(int lineNumber) {
-        Element root = getDocument().getDefaultRootElement();
+        Element root = getStyledDocument().getDefaultRootElement();
         if (lineNumber < 0 || lineNumber >= root.getElementCount()) {
             return ""; // Return empty string if line number is out of bounds
         }
-    
+
         Element lineElement = root.getElement(lineNumber);
         int startOffset = lineElement.getStartOffset();
         int endOffset = lineElement.getEndOffset();
-    
+
         try {
-            return getDocument().getText(startOffset, endOffset - startOffset);
+            return getStyledDocument().getText(startOffset, endOffset - startOffset);
         } catch (BadLocationException e) {
             e.printStackTrace();
             return ""; // Handle exception by returning empty string
@@ -207,8 +245,8 @@ public class CodeTextArea extends JTextArea {
 
     public static void main(String[] args) {
         JFrame frame = new JFrame("Code Editor");
-        CodeTextArea codeTextArea = new CodeTextArea();
-        frame.add(new JScrollPane(codeTextArea));
+        CodeTextPane codeTextPane = new CodeTextPane();
+        frame.add(new JScrollPane(codeTextPane));
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(800, 600);
         frame.setVisible(true);

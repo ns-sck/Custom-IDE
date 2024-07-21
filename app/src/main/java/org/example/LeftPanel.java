@@ -42,7 +42,6 @@ public class LeftPanel {
             if (selectedNode == null) return;
             File selectedFile = new File(rootDirectory, getFilePath(selectedNode));
             if (selectedFile.isFile()) {
-                mainFrame.addTab(selectedFile.getName(), selectedFile);
             }
         });
 

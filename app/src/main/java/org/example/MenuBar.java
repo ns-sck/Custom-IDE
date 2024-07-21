@@ -27,18 +27,13 @@ public class MenuBar {
         
         // FileHandler instance
         FileHandler fileHandler = new FileHandler(frame);
-        
-        // Action listeners for menu items
-        newMenuItem.addActionListener(e -> {
-            frame.addTab("Untitled", null);
-        });
+    
         
         openMenuItem.addActionListener(e -> {
             JFileChooser fileChooser = new JFileChooser();
             int userChoice = fileChooser.showOpenDialog(frame);
             if (userChoice == JFileChooser.APPROVE_OPTION) {
                 File selectedFile = fileChooser.getSelectedFile();
-                frame.addTab(selectedFile.getName(), selectedFile);
             }
         });
         
@@ -82,9 +77,9 @@ public class MenuBar {
         if (selectedFont != null) {
             JScrollPane selectedScrollPane = (JScrollPane) frame.getTabbedPane().getSelectedComponent();
             if (selectedScrollPane != null) {
-                CodeTextArea codeTextArea = (CodeTextArea) selectedScrollPane.getViewport().getView();
-                Font currentFont = codeTextArea.getFont();
-                codeTextArea.setFont(new Font(selectedFont, currentFont.getStyle(), currentFont.getSize()));
+                CodeTextPane CodeTextPane = (CodeTextPane) selectedScrollPane.getViewport().getView();
+                Font currentFont = CodeTextPane.getFont();
+                CodeTextPane.setFont(new Font(selectedFont, currentFont.getStyle(), currentFont.getSize()));
             }
         }
     }
@@ -96,9 +91,9 @@ public class MenuBar {
                 int fontSize = Integer.parseInt(input);
                 JScrollPane selectedScrollPane = (JScrollPane) frame.getTabbedPane().getSelectedComponent();
                 if (selectedScrollPane != null) {
-                    CodeTextArea codeTextArea = (CodeTextArea) selectedScrollPane.getViewport().getView();
-                    Font currentFont = codeTextArea.getFont();
-                    codeTextArea.setFont(currentFont.deriveFont((float) fontSize));
+                    CodeTextPane CodeTextPane = (CodeTextPane) selectedScrollPane.getViewport().getView();
+                    Font currentFont = CodeTextPane.getFont();
+                    CodeTextPane.setFont(currentFont.deriveFont((float) fontSize));
                 }
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(frame, "Invalid font size entered.", "Error", JOptionPane.ERROR_MESSAGE);

@@ -19,7 +19,6 @@ public class FileHandler {
             while ((line = reader.readLine()) != null) {
                 content.append(line).append("\n");
             }
-            mainFrame.addTab(file.getName(), file); // Add a new tab with the file content
         } catch (IOException ex) {
             ex.printStackTrace();
             JOptionPane.showMessageDialog(mainFrame, "Error opening file: " + file.getName(), "File Open Error", JOptionPane.ERROR_MESSAGE);
