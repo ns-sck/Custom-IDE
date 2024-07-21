@@ -7,9 +7,9 @@ import java.io.*;
 
 public class MainFrame extends JFrame {
 
-    private CodeTextArea codeTextArea; // Use CodeTextArea instead of JTextArea
-    private File currentFile; // Track the currently opened file
+    private JTabbedPane tabbedPane; // Use JTabbedPane to manage multiple tabs
     private FileHandler fileHandler; // Instance of FileHandler to handle file operations
+    private ConfigManager configManager; // Instance of ConfigManager
 
     public MainFrame() {
         super("Your IDE Name");
@@ -21,48 +21,25 @@ public class MainFrame extends JFrame {
         // Initialize FileHandler
         fileHandler = new FileHandler(this);
 
+        // Initialize ConfigManager
+        configManager = new ConfigManager();
+
         // Create components
         JMenuBar menuBar = MenuBar.createMenuBar(this); // Pass 'this' to provide MainFrame instance
         JPanel leftPanel = LeftPanel.createLeftPanel(this); // Pass 'this' to provide MainFrame instance
-        codeTextArea = new CodeTextArea(); // Initialize CodeTextArea
-        
-        // Wrap codeTextArea in a JScrollPane
-        JScrollPane scrollPane = new JScrollPane(codeTextArea);
-        scrollPane.setPreferredSize(new Dimension(600, 400)); // Example preferred size
-        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        tabbedPane = new JTabbedPane(); // Initialize JTabbedPane
 
-        // Apply custom ScrollBar UI
-        JScrollBar verticalScrollBar = scrollPane.getVerticalScrollBar();
-        JScrollBar horizontalScrollBar = scrollPane.getHorizontalScrollBar();
-        verticalScrollBar.setUI(new CustomScrollBarUI(Color.BLUE, Color.LIGHT_GRAY)); // Customize thumb and track color
-        horizontalScrollBar.setUI(new CustomScrollBarUI(Color.BLUE, Color.LIGHT_GRAY)); // Customize thumb and track color
-
-        // Create a panel for the south button to ensure no gap
-        JPanel southPanel = new JPanel(new BorderLayout());
-        southPanel.setBorder(null); // Remove border from panel
-        southPanel.setBackground(Color.BLACK); // Match the background color
-        
-        // Add Open Terminal button
-        JButton openTerminalButton = new JButton("Open Terminal");
-        openTerminalButton.setMargin(new Insets(0, 0, 0, 0)); // Remove margins
-        openTerminalButton.setBorder(null); // Remove border
-        openTerminalButton.setBackground(Color.GRAY); // Set a background color if needed
-        openTerminalButton.setForeground(Color.WHITE); // Set text color if needed
-        southPanel.add(openTerminalButton, BorderLayout.CENTER);
-        
         // Add components to content pane
         getContentPane().setLayout(new BorderLayout());
         getContentPane().add(menuBar, BorderLayout.NORTH);
         getContentPane().add(leftPanel, BorderLayout.WEST);
-        getContentPane().add(scrollPane, BorderLayout.CENTER);
-        getContentPane().add(southPanel, BorderLayout.SOUTH);
-        
+        getContentPane().add(tabbedPane, BorderLayout.CENTER);
+
         // Add keyboard shortcut (Ctrl+T) for opening terminal
         KeyStroke ctrlT = KeyStroke.getKeyStroke(KeyEvent.VK_T, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
-        InputMap inputMap = codeTextArea.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        InputMap inputMap = tabbedPane.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         inputMap.put(ctrlT, "openTerminal");
-        ActionMap actionMap = codeTextArea.getActionMap();
+        ActionMap actionMap = tabbedPane.getActionMap();
         actionMap.put("openTerminal", new AbstractAction() {
             public void actionPerformed(ActionEvent e) {
                 openTerminal();
@@ -76,7 +53,7 @@ public class MainFrame extends JFrame {
         try {
             String os = System.getProperty("os.name").toLowerCase();
             String command = "";
-            
+
             if (os.contains("win")) {
                 // For Windows
                 command = "cmd.exe /c start cmd.exe /K cd \"%cd%\"";
@@ -88,32 +65,50 @@ public class MainFrame extends JFrame {
                 JOptionPane.showMessageDialog(this, "Unsupported OS for opening terminal.", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            
+
             Runtime.getRuntime().exec(command);
         } catch (IOException ex) {
             ex.printStackTrace();
             JOptionPane.showMessageDialog(this, "Failed to open terminal.", "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
-    
-    // Getter method for codeTextArea
-    public CodeTextArea getCodeTextArea() {
-        return codeTextArea;
+
+    // Method to add a new tab with a file
+    public void addTab(String title, File file) {
+        CodeTextArea newTextArea = new CodeTextArea();
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            StringBuilder content = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                content.append(line).append("\n");
+            }
+            newTextArea.setText(content.toString());
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error opening file: " + file.getName(), "File Open Error", JOptionPane.ERROR_MESSAGE);
+        }
+        newTextArea.setFile(file);
+
+        int fontSize = Integer.parseInt(configManager.getProperty("font.size", "16")); // Default to 16 if not set
+        String font = configManager.getProperty("font", "Menlo");
+        newTextArea.setFont(new Font(font, Font.PLAIN, fontSize));
+
+        JScrollPane scrollPane = new JScrollPane(newTextArea);
+        scrollPane.setPreferredSize(new Dimension(600, 400)); // Example preferred size
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+
+        tabbedPane.addTab(title, scrollPane);
+        tabbedPane.setSelectedComponent(scrollPane);
     }
 
-    // Getter method for currentFile
-    public File getCurrentFile() {
-        return currentFile;
-    }
-
-    // Setter method for currentFile
-    public void setCurrentFile(File file) {
-        this.currentFile = file;
-    }
-
-    // Getter method for fileHandler
-    public FileHandler getFileHandler() {
-        return fileHandler;
+    // Getter method for the currently selected CodeTextArea
+    public CodeTextArea getCurrentCodeTextArea() {
+        JScrollPane selectedScrollPane = (JScrollPane) tabbedPane.getSelectedComponent();
+        if (selectedScrollPane != null) {
+            return (CodeTextArea) selectedScrollPane.getViewport().getView();
+        }
+        return null;
     }
 
     // Method to open a file
@@ -123,19 +118,20 @@ public class MainFrame extends JFrame {
         if (userChoice == JFileChooser.APPROVE_OPTION) {
             File selectedFile = fileChooser.getSelectedFile();
             fileHandler.openFile(selectedFile); // Delegate file opening to FileHandler
+            LeftPanel.updateTree(selectedFile.getParentFile()); // Update the directory tree
         }
     }
 
     // Method to save file
     public void saveFile() {
-        if (currentFile == null) {
-            fileHandler.saveAs(); // If no current file, prompt for save location
-        } else {
-            fileHandler.saveToFile(); // Otherwise, save to current file
-        }
+        fileHandler.saveToFile(); // Delegate file saving to FileHandler
     }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(MainFrame::new);
+    }
+    
+    public JTabbedPane getTabbedPane() {
+        return tabbedPane;
     }
 }

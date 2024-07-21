@@ -6,11 +6,13 @@ import javax.swing.event.*;
 import java.awt.*;
 import javax.swing.undo.UndoManager;
 import java.awt.event.*;
+import java.io.File;
 
 public class CodeTextArea extends JTextArea {
 
     private static final int TAB_SIZE = 4;
     private UndoManager undoManager;
+    private File file; // Variable to store the associated file
 
     public CodeTextArea() {
         super();
@@ -75,6 +77,14 @@ public class CodeTextArea extends JTextArea {
         return getText();
     }
 
+    public void setFile(File file) {
+        this.file = file;
+    }
+
+    public File getFile() {
+        return this.file;
+    }
+
     private void handleAutoPairing(KeyEvent e) {
         char typedChar = e.getKeyChar();
         
@@ -87,6 +97,12 @@ public class CodeTextArea extends JTextArea {
                 break;
             case '{':
                 insertPair('}');
+                break;
+            case '\'':
+                insertPair('\'');
+                break;
+            case '"':
+                insertPair('"');
                 break;
         }
     }
@@ -139,18 +155,19 @@ public class CodeTextArea extends JTextArea {
     }
 
     private boolean isBetweenPairs(int caretPosition) {
+        if (caretPosition < 2) return false;
         Document doc = getDocument();
         String textBefore = "";
-        
+        caretPosition -= 2;
         try {
-            if (caretPosition >= 1 && caretPosition < doc.getLength()) {
+            if (caretPosition < doc.getLength()) {
                 textBefore = doc.getText(caretPosition, 1);
             }
         } catch (BadLocationException e) {
             e.printStackTrace();
         }
         // something to fix later
-        return textBefore.equals(")") || textBefore.equals("]") || textBefore.equals("}");
+        return textBefore.equals("(") || textBefore.equals("[") || textBefore.equals("{");
     }
 
     private int getStartOfLineAbove(int caretPosition) {

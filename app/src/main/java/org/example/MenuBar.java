@@ -3,12 +3,14 @@ package app.src.main.java.org.example;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.io.File;
 
 public class MenuBar {
-    
+
     public static JMenuBar createMenuBar(MainFrame frame) {
         JMenuBar menuBar = new JMenuBar();
         menuBar.setBackground(new Color(0x020e21));
+        
         // File menu
         JMenu fileMenu = new JMenu("File");
         fileMenu.setForeground(Color.WHITE);
@@ -23,28 +25,44 @@ public class MenuBar {
         fileMenu.addSeparator();
         fileMenu.add(exitMenuItem);
         
+        // FileHandler instance
+        FileHandler fileHandler = new FileHandler(frame);
+        
+        // Action listeners for menu items
+        newMenuItem.addActionListener(e -> {
+            frame.addTab("Untitled", null);
+        });
+        
+        openMenuItem.addActionListener(e -> {
+            JFileChooser fileChooser = new JFileChooser();
+            int userChoice = fileChooser.showOpenDialog(frame);
+            if (userChoice == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fileChooser.getSelectedFile();
+                frame.addTab(selectedFile.getName(), selectedFile);
+            }
+        });
+        
+        saveMenuItem.addActionListener(e -> {
+            fileHandler.saveToFile();
+        });
+        
+        exitMenuItem.addActionListener(e -> {
+            System.exit(0);
+        });
+        
         // Settings menu
         JMenu settingsMenu = new JMenu("Settings");
         settingsMenu.setForeground(Color.WHITE);
 
-        
         // Font submenu
         JMenu fontMenu = new JMenu("Font");
         fontMenu.setForeground(Color.WHITE);
         
         JMenuItem changeFontMenuItem = new JMenuItem("Change Font");
-        changeFontMenuItem.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                changeFont(frame);
-            }
-        });
+        changeFontMenuItem.addActionListener(e -> changeFont(frame));
         
         JMenuItem changeFontSizeMenuItem = new JMenuItem("Change Font Size");
-        changeFontSizeMenuItem.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                changeFontSize(frame);
-            }
-        });
+        changeFontSizeMenuItem.addActionListener(e -> changeFontSize(frame));
         
         fontMenu.add(changeFontMenuItem);
         fontMenu.add(changeFontSizeMenuItem);
@@ -62,8 +80,12 @@ public class MenuBar {
         String[] fonts = GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames();
         String selectedFont = (String) JOptionPane.showInputDialog(frame, "Choose Font:", "Font Selection", JOptionPane.PLAIN_MESSAGE, null, fonts, fonts[0]);
         if (selectedFont != null) {
-            Font currentFont = frame.getCodeTextArea().getFont();
-            frame.getCodeTextArea().setFont(new Font(selectedFont, currentFont.getStyle(), currentFont.getSize()));
+            JScrollPane selectedScrollPane = (JScrollPane) frame.getTabbedPane().getSelectedComponent();
+            if (selectedScrollPane != null) {
+                CodeTextArea codeTextArea = (CodeTextArea) selectedScrollPane.getViewport().getView();
+                Font currentFont = codeTextArea.getFont();
+                codeTextArea.setFont(new Font(selectedFont, currentFont.getStyle(), currentFont.getSize()));
+            }
         }
     }
     
@@ -72,8 +94,12 @@ public class MenuBar {
         if (input != null && !input.isEmpty()) {
             try {
                 int fontSize = Integer.parseInt(input);
-                Font currentFont = frame.getCodeTextArea().getFont();
-                frame.getCodeTextArea().setFont(currentFont.deriveFont((float) fontSize));
+                JScrollPane selectedScrollPane = (JScrollPane) frame.getTabbedPane().getSelectedComponent();
+                if (selectedScrollPane != null) {
+                    CodeTextArea codeTextArea = (CodeTextArea) selectedScrollPane.getViewport().getView();
+                    Font currentFont = codeTextArea.getFont();
+                    codeTextArea.setFont(currentFont.deriveFont((float) fontSize));
+                }
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(frame, "Invalid font size entered.", "Error", JOptionPane.ERROR_MESSAGE);
             }
