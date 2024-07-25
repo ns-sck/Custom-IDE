@@ -3,25 +3,52 @@ package app.src.main.java.org.example;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.Properties;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.*;
+
+
 
 public class BottomPanel extends JPanel {
     private static JPanel panel;
+    private static String utilityDirectory;
+    private static File inputFile;
+    private static File outputFile;
 
     public static JPanel createBottomPanel(MainFrame mainFrame) {
+        Properties config = loadConfig();
+        utilityDirectory = config.getProperty("utility.directory", "C:");
+        inputFile = new File(config.getProperty("input.file", "C:"));
+        outputFile = new File(config.getProperty("output.file", "C:"));
+
         panel = new JPanel(new FlowLayout());
         panel.setBackground(Color.BLACK);
-
         JButton directoryButton = createButton("Directories", mainFrame);
         JButton terminalButton = createButton("Terminal", mainFrame);
         JButton templatesButton = createButton("Templates", mainFrame);
+        JButton inputButton = createButton("Input", mainFrame);
+        JButton outputButton = createButton("Output", mainFrame);
 
         panel.add(directoryButton);
+        panel.add(inputButton);
+        panel.add(outputButton);
         panel.add(terminalButton);
         panel.add(templatesButton);
 
-        setupKeyboardNavigation(directoryButton, terminalButton, templatesButton);
+        setupKeyboardNavigation(directoryButton, inputButton, outputButton, terminalButton, templatesButton);
 
         return panel;
+    }
+
+    private static Properties loadConfig() {
+        Properties config = new Properties();
+        try (FileInputStream input = new FileInputStream("config.properties")) {
+            config.load(input);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return config;
     }
 
     private static JButton createButton(String text, MainFrame mainFrame) {
@@ -41,10 +68,14 @@ public class BottomPanel extends JPanel {
                 button.addActionListener(e -> mainFrame.openTerminal());
                 break;
             case "Templates":
-                button.addActionListener(e -> {
-                    // Handle templates button action
-                });
+                button.addActionListener(e -> mainFrame.openUtilityDirectory(utilityDirectory));
                 break;
+            case "Input":
+                button.addActionListener(e -> mainFrame.openFile(inputFile));
+            break;
+            case "Output":
+                button.addActionListener(e -> mainFrame.openFile(outputFile));
+            break;
         }
 
         button.addFocusListener(new FocusListener() {

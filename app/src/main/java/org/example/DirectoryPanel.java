@@ -15,25 +15,20 @@ public class DirectoryPanel extends JPanel {
     public DirectoryPanel(FileSelectionListener fileSelectionListener) {
         this.fileSelectionListener = fileSelectionListener;
         setLayout(new BorderLayout());
-
         listModel = new DefaultListModel<>();
         fileList = new JList<>(listModel);
         fileList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         fileList.setFocusable(true);
-
-        // Set colors for JList
         fileList.setBackground(Color.BLACK);
         fileList.setForeground(Color.WHITE);
-
         fileList.setCellRenderer(new DefaultListCellRenderer() {
             @Override
             public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
                 Component cell = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
                 File file = (File) value;
-                String displayName = file.getName(); // Display only the name
+                String displayName = file.getName();
                 setText(displayName);
 
-                // Set background and foreground colors
                 cell.setBackground(isSelected ? Color.DARK_GRAY : Color.BLACK);
                 cell.setForeground(isSelected ? Color.WHITE : Color.LIGHT_GRAY);
 
@@ -46,21 +41,18 @@ public class DirectoryPanel extends JPanel {
         scrollPane.setBackground(Color.BLACK);
         add(scrollPane, BorderLayout.CENTER);
 
-        // Set initial directory
         currentDirectory = new File(System.getProperty("user.home"));
         loadDirectory(currentDirectory);
 
-        // Mouse listener for double-click actions
         fileList.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 2) { // Double-click
+                if (e.getClickCount() == 2) {
                     openSelectedFile();
                 }
             }
         });
 
-        // Key listener for Enter key actions
         fileList.addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
@@ -70,8 +62,7 @@ public class DirectoryPanel extends JPanel {
             }
         });
 
-        // Focus the list on component showing
-        fileList.setSelectedIndex(0); // Default selection to the first item
+        fileList.setSelectedIndex(0);
     }
 
     private void openSelectedFile() {
@@ -84,7 +75,6 @@ public class DirectoryPanel extends JPanel {
                     navigateTo(selectedFile);
                 }
             } else {
-                // Notify the listener to open the file in CodeTextArea
                 if (fileSelectionListener != null) {
                     fileSelectionListener.onFileSelected(selectedFile);
                 }
@@ -92,11 +82,10 @@ public class DirectoryPanel extends JPanel {
         }
     }
 
-    private void loadDirectory(File directory) {
+    public void loadDirectory(File directory) {
         currentDirectory = directory;
         listModel.clear();
 
-        // Add ".." to navigate up if not in root directory
         if (currentDirectory.getParentFile() != null) {
             listModel.addElement(new File(".."));
         }
@@ -125,8 +114,7 @@ public class DirectoryPanel extends JPanel {
     public JList<File> getFileList() {
         return fileList;
     }
-
-    // Interface for file selection listener
+    
     public interface FileSelectionListener {
         void onFileSelected(File file);
     }

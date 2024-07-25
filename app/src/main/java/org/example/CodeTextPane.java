@@ -6,33 +6,54 @@ import java.awt.*;
 import java.awt.event.*;
 import javax.swing.undo.UndoManager;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Properties;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+// import org.fife.ui.rsyntaxtextarea.*;
+// import org.fife.ui.rsyntaxtextarea.*;
+import javax.swing.event.UndoableEditListener;
 
 public class CodeTextPane extends JTextPane {
 
-    private static final int TAB_SIZE = 8;
+    private static final int TAB_SIZE = 4;
     private UndoManager undoManager;
-    private File file; // Variable to store the associated file
+    public UndoableEditListener undoableEditListener;
+    private File file;
+    public boolean trackingEnabled = true;
+    private static CodeTextPane focusedPane;
 
     public CodeTextPane() {
         super();
-        setBackground(new Color(0x01118a));
-        setForeground(Color.WHITE);
-        setFont(new Font("Menlo", Font.PLAIN, 16));
-        setCaretColor(Color.WHITE);
-        setMargin(new Insets(0, 8, 0, 0));
-        undoManager = new UndoManager();
-        getDocument().addUndoableEditListener(undoManager);
+        
+        Properties config = loadConfig();
+        String fontName = config.getProperty("font", "Menlo");
+        int fontSize = Integer.parseInt(config.getProperty("font.size", "16"));
+        Color textColor = Color.decode(config.getProperty("default.text.color", "0xffffff"));
+        Color backgroundColor = Color.decode(config.getProperty("textpane.background.color", "0x000847"));
 
-        // Set up the default style
+        setBackground(backgroundColor);
+        setForeground(textColor);
+        setFont(new Font(fontName, Font.PLAIN, fontSize));
+        setCaretColor(textColor);
+        setMargin(new Insets(16, 16, 8, 8));
+        setCustomTabSize(TAB_SIZE);
+        undoManager = new UndoManager();
+
         StyledDocument doc = getStyledDocument();
         Style style = doc.addStyle("defaultStyle", null);
-        StyleConstants.setFontFamily(style, "Menlo");
-        StyleConstants.setFontSize(style, 16);
-        StyleConstants.setForeground(style, Color.WHITE);
-        StyleConstants.setBackground(style, new Color(0x01118a));
+        StyleConstants.setFontFamily(style, fontName);
+        StyleConstants.setFontSize(style, fontSize);
+        StyleConstants.setForeground(style, textColor);
+        StyleConstants.setBackground(style, backgroundColor);
         doc.setCharacterAttributes(0, doc.getLength(), style, false);
+        
+        doc.addUndoableEditListener(e -> {
+            if (trackingEnabled) {
+                undoManager.addEdit(e.getEdit());
+            }
+        });
 
         addKeyListener(new KeyAdapter() {
             @Override
@@ -48,27 +69,6 @@ public class CodeTextPane extends JTextPane {
             }
         });
 
-        // Bind Ctrl+Z to undo
-        getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_DOWN_MASK), "Undo");
-        getActionMap().put("Undo", new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (undoManager.canUndo()) {
-                    undoManager.undo();
-                }
-            }
-        });
-
-        // Bind Ctrl+Y to redo
-        getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, InputEvent.CTRL_DOWN_MASK), "Redo");
-        getActionMap().put("Redo", new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (undoManager.canRedo()) {
-                    undoManager.redo();
-                }
-            }
-        });
         getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
@@ -85,27 +85,58 @@ public class CodeTextPane extends JTextPane {
                 // For styled documents, this method is not used
             }
         });
-    }
 
+        this.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusGained(FocusEvent e) {
+                focusedPane = CodeTextPane.this;
+            }
+        });
+
+        // getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_DOWN_MASK), "Undo");
+        // getActionMap().put("Undo", new AbstractAction() {
+        //     @Override
+        //     public void actionPerformed(ActionEvent e) {
+        //         if (undoManager.canUndo()) {
+        //             undoManager.undo();
+        //         }
+        //     }
+        // });
+
+        // getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, InputEvent.CTRL_DOWN_MASK), "Redo");
+        // getActionMap().put("Redo", new AbstractAction() {
+        //     @Override
+        //     public void actionPerformed(ActionEvent e) {
+        //         if (undoManager.canRedo()) {
+        //             undoManager.redo();
+        //         }
+        //     }
+        // });
+
+    }
+    private Properties loadConfig() {
+        Properties config = new Properties();
+        try (FileInputStream input = new FileInputStream("config.properties")) {
+            config.load(input);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return config;
+    }
     public void setCustomTabSize(int tabSize) {
-        // Obtain the StyledDocument
-        StyledDocument doc = getStyledDocument();
-        SimpleAttributeSet attrs = new SimpleAttributeSet();
-        // Create or get the existing style
-        Style style = doc.getStyle(StyleContext.DEFAULT_STYLE);
-        if (style == null) {
-            style = doc.addStyle(StyleContext.DEFAULT_STYLE, null);
+        FontMetrics fm = getFontMetrics(getFont());
+        int charWidth = fm.charWidth('m'); // Width of a single character (m is usually one of the widest)
+        int tabWidth = charWidth * tabSize;
+
+        TabStop[] tabs = new TabStop[10];
+        for (int i = 0; i < tabs.length; i++) {
+            tabs[i] = new TabStop((i + 1) * tabWidth);
         }
 
-        // Create a new TabSet with a TabStop for the desired tab size
-        TabStop[] tabStops = new TabStop[] { new TabStop(tabSize) };
-        TabSet tabSet = new TabSet(tabStops);
-        
-        // Apply the TabSet to the style
-        StyleConstants.setTabSet(style, tabSet);
-        
-        // Apply the style to the entire document
-        doc.setParagraphAttributes(0, doc.getLength(), style, false);
+        TabSet tabSet = new TabSet(tabs);
+        StyleContext sc = StyleContext.getDefaultStyleContext();
+        AttributeSet aset = sc.addAttribute(SimpleAttributeSet.EMPTY, StyleConstants.TabSet, tabSet);
+        setParagraphAttributes(aset, false);
     }
 
     public void setTextContent(String text) {
@@ -242,13 +273,8 @@ public class CodeTextPane extends JTextPane {
             return ""; // Handle exception by returning empty string
         }
     }
-
-    public static void main(String[] args) {
-        JFrame frame = new JFrame("Code Editor");
-        CodeTextPane codeTextPane = new CodeTextPane();
-        frame.add(new JScrollPane(codeTextPane));
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(800, 600);
-        frame.setVisible(true);
+    
+    public static CodeTextPane getFocusedPane() {
+        return focusedPane;
     }
 }
