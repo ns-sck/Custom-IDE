@@ -6,11 +6,11 @@ import java.awt.event.*;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 
 public class MainFrame extends JFrame implements DirectoryPanel.FileSelectionListener {
 
     private FileHandler fileHandler;
-    private ConfigManager configManager;
     private JPanel bottomPanel;
     private DirectoryPanel directoryPanel;
     private CodeTextPane currentCodeTextPane;
@@ -27,6 +27,8 @@ public class MainFrame extends JFrame implements DirectoryPanel.FileSelectionLis
     private boolean isFullscreen = false;
     private Rectangle windowedBounds;
 
+    private Properties config;
+
     public MainFrame() {
         super("DEI");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -35,7 +37,6 @@ public class MainFrame extends JFrame implements DirectoryPanel.FileSelectionLis
         setBackground(Color.BLACK);
 
         fileHandler = new FileHandler(this);
-        configManager = new ConfigManager();
 
         bottomPanel = BottomPanel.createBottomPanel(this);
         centerPanel = new JPanel(new BorderLayout());
@@ -46,6 +47,8 @@ public class MainFrame extends JFrame implements DirectoryPanel.FileSelectionLis
         getContentPane().add(menuBar, BorderLayout.NORTH);
         getContentPane().add(centerPanel, BorderLayout.CENTER);
         getContentPane().add(bottomPanel, BorderLayout.SOUTH);
+
+        loadConfigProperties();
 
         KeyStroke ctrlT = KeyStroke.getKeyStroke(KeyEvent.VK_T, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
         InputMap inputMap = getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
@@ -66,6 +69,28 @@ public class MainFrame extends JFrame implements DirectoryPanel.FileSelectionLis
                 toggleFocus();
             }
         });
+
+        KeyStroke ctrlW = KeyStroke.getKeyStroke(KeyEvent.VK_W, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
+        InputMap inputMap2 = getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        inputMap2.put(ctrlW, "closeCodeTextPane");
+        ActionMap actionMap2 = getRootPane().getActionMap();
+        actionMap2.put("closeCodeTextPane", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                closeCodeTextPane();
+            }
+        });
+
+        KeyStroke ctrlS = KeyStroke.getKeyStroke(KeyEvent.VK_S, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
+        inputMap.put(ctrlS, "saveFile");
+        actionMap.put("saveFile", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                saveFile();
+            }
+        });
+
+
         addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
@@ -74,6 +99,7 @@ public class MainFrame extends JFrame implements DirectoryPanel.FileSelectionLis
                 }
             }
         });
+
         KeyStroke f11 = KeyStroke.getKeyStroke(KeyEvent.VK_F11, 0);
         inputMap.put(f11, "toggleFullscreen");
         actionMap.put("toggleFullscreen", new AbstractAction() {
@@ -83,7 +109,28 @@ public class MainFrame extends JFrame implements DirectoryPanel.FileSelectionLis
             }
         });
 
+        KeyStroke ctrlR = KeyStroke.getKeyStroke(KeyEvent.VK_R, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask());
+        InputMap inputMap3 = getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        inputMap3.put(ctrlR, "runCode");
+        ActionMap actionMap3 = getRootPane().getActionMap();
+        actionMap3.put("runCode", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                runCurrentCode();
+            }
+        });
+
         setVisible(true);
+    }
+
+    private void loadConfigProperties() {
+        config = new Properties();
+        try (InputStream input = new FileInputStream("config.properties")) {
+            config.load(input);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Failed to load configuration properties.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     @Override
@@ -117,7 +164,7 @@ public class MainFrame extends JFrame implements DirectoryPanel.FileSelectionLis
         revalidate();
         repaint();
     }
-    
+
     public void openFile() {
         JFileChooser fileChooser = new JFileChooser();
         int userChoice = fileChooser.showOpenDialog(this);
@@ -130,6 +177,7 @@ public class MainFrame extends JFrame implements DirectoryPanel.FileSelectionLis
     public void openFile(File file) {
         try {
             CodeTextPane codeTextPane = new CodeTextPane();
+            codeTextPane.makeFocusable(this);
             try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
                 StringBuilder content = new StringBuilder();
                 String line;
@@ -142,65 +190,62 @@ public class MainFrame extends JFrame implements DirectoryPanel.FileSelectionLis
                 JOptionPane.showMessageDialog(this, "Error opening file: " + file.getName(), "File Open Error", JOptionPane.ERROR_MESSAGE);
             }
             codeTextPane.setFile(file);
-            
+    
+            applyConfigurations(codeTextPane);
+    
             openCodeTextPanes.add(codeTextPane);
-            
+    
             if (openCodeTextPanes.size() == 1) {
-
                 scrollPane1 = new JScrollPane(openCodeTextPanes.get(0));
                 scrollPane1.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
                 scrollPane1.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
                 centerPanel.removeAll();
                 centerPanel.add(scrollPane1, BorderLayout.CENTER);
-
             } else if (openCodeTextPanes.size() == 2) {
-                
                 scrollPane1 = new JScrollPane(openCodeTextPanes.get(0));
                 scrollPane1.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
                 scrollPane1.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-
+    
                 scrollPane2 = new JScrollPane(openCodeTextPanes.get(1));
                 scrollPane2.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
                 scrollPane2.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-
+    
                 firstPane = new JPanel(new BorderLayout());
                 firstPane.add(scrollPane1, BorderLayout.CENTER);
     
                 secondPane = new JPanel(new BorderLayout());
                 secondPane.add(scrollPane2, BorderLayout.CENTER);
-                
+    
                 splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, firstPane, secondPane);
                 splitPane.setDividerLocation(centerPanel.getWidth() / 2);
                 splitPane.setDividerSize(3);
-                splitPane.setOneTouchExpandable(true);
+                splitPane.setOneTouchExpandable(false);
                 splitPane.setContinuousLayout(true);
                 centerPanel.removeAll();
                 centerPanel.add(splitPane, BorderLayout.CENTER);
-
             } else if (openCodeTextPanes.size() == 3) {
-
                 scrollPane3 = new JScrollPane(openCodeTextPanes.get(2));
                 scrollPane3.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
                 scrollPane3.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-
+    
                 thirdPane = new JPanel(new BorderLayout());
                 thirdPane.add(scrollPane3, BorderLayout.CENTER);
     
                 JSplitPane rightSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, secondPane, thirdPane);
                 rightSplitPane.setDividerSize(3);
-                rightSplitPane.setOneTouchExpandable(true);
+                rightSplitPane.setOneTouchExpandable(false);
                 rightSplitPane.setContinuousLayout(true);
                 splitPane.setRightComponent(rightSplitPane);
                 splitPane.setDividerLocation(centerPanel.getWidth() / 2);
                 rightSplitPane.setDividerLocation(centerPanel.getWidth() / 4);
-                
+    
                 centerPanel.removeAll();
                 centerPanel.add(splitPane, BorderLayout.CENTER);
             } else {
                 scrollPane3 = new JScrollPane(codeTextPane);
                 scrollPane3.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
                 scrollPane3.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-
+    
                 openCodeTextPanes.set(2, codeTextPane);
                 thirdPane.removeAll();
                 thirdPane.add(scrollPane3, BorderLayout.CENTER);
@@ -209,13 +254,23 @@ public class MainFrame extends JFrame implements DirectoryPanel.FileSelectionLis
                 centerPanel.removeAll();
                 centerPanel.add(splitPane, BorderLayout.CENTER);
             }
-    
+            currentCodeTextPane = codeTextPane;
             revalidate();
             repaint();
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Failed to open file: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             e.printStackTrace();
         }
+    }
+
+    private void applyConfigurations(CodeTextPane codeTextPane) {
+        String fontName = config.getProperty("font", "Menlo");
+        int fontSize = Integer.parseInt(config.getProperty("font.size", "16"));
+        Color backgroundColor = Color.decode(config.getProperty("textpane.background.color", "#000847"));
+
+        codeTextPane.setFont(new Font(fontName, Font.PLAIN, fontSize));
+        codeTextPane.setBackground(backgroundColor);
+        codeTextPane.setForeground(Color.decode(config.getProperty("default.text.color", "#ffffff")));
     }
 
     public void saveFile() {
@@ -255,7 +310,7 @@ public class MainFrame extends JFrame implements DirectoryPanel.FileSelectionLis
             changeFocus();
         }
     }
-    
+
     public void focusBottomPanel() {
         for (Component component : bottomPanel.getComponents()) {
             if (component.isFocusable() && !(component instanceof JScrollBar)) {
@@ -264,29 +319,71 @@ public class MainFrame extends JFrame implements DirectoryPanel.FileSelectionLis
             }
         }
     }
-    
+
     public void changeFocus() {
-        for (Component component : centerPanel.getComponents()) {
-            if (component instanceof JScrollPane) {
-                JScrollPane scrollPane = (JScrollPane) component;
-                JViewport viewport = scrollPane.getViewport();
-                Component view = viewport.getView();
-                if (view instanceof CodeTextPane) {
-                    view.requestFocus();
-                    return;
-                }
-            } else if (component instanceof DirectoryPanel) {
-                DirectoryPanel dirPanel = (DirectoryPanel) component;
-                if (dirPanel.getFileList().isFocusable()) {
-                    dirPanel.getFileList().requestFocus();
-                    return;
-                }
+        if (directoryPanel != null && centerPanel.isAncestorOf(directoryPanel)) {
+            if (directoryPanel.getFileList().isFocusable()) {
+                directoryPanel.getFileList().requestFocus();
+                return;
             }
         }
+    
+        int currentFocusIndex = openCodeTextPanes.indexOf(currentCodeTextPane);
+    
+        if (currentFocusIndex == -1 || openCodeTextPanes.isEmpty()) {
+            return;
+        }
+    
+        int nextFocusIndex = (currentFocusIndex + 1) % openCodeTextPanes.size();
+        currentCodeTextPane = openCodeTextPanes.get(nextFocusIndex);
+        setCurrentCodeTextPane(currentCodeTextPane);
+        currentCodeTextPane.requestFocus();
     }
 
     public CodeTextPane getCurrentCodeTextPane() {
         return currentCodeTextPane;
+    }
+
+    public List<CodeTextPane> getOpenCodeTextPanes() {
+        return openCodeTextPanes;
+    }
+
+    public void closeCodeTextPane() {
+        if (currentCodeTextPane == null) {
+            return;
+        }
+        openCodeTextPanes.remove(currentCodeTextPane);
+        centerPanel.removeAll();
+        if (openCodeTextPanes.size() == 1) {
+            scrollPane1 = new JScrollPane(openCodeTextPanes.get(0));
+            scrollPane1.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
+            scrollPane1.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+            centerPanel.add(scrollPane1, BorderLayout.CENTER);
+        } else if (openCodeTextPanes.size() == 2) {
+            scrollPane1 = new JScrollPane(openCodeTextPanes.get(0));
+            scrollPane1.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
+            scrollPane1.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+
+            scrollPane2 = new JScrollPane(openCodeTextPanes.get(1));
+            scrollPane2.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
+            scrollPane2.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+
+            firstPane = new JPanel(new BorderLayout());
+            firstPane.add(scrollPane1, BorderLayout.CENTER);
+
+            secondPane = new JPanel(new BorderLayout());
+            secondPane.add(scrollPane2, BorderLayout.CENTER);
+
+            splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, firstPane, secondPane);
+            splitPane.setDividerLocation(centerPanel.getWidth() / 2);
+            splitPane.setDividerSize(3);
+            splitPane.setOneTouchExpandable(false);
+            splitPane.setContinuousLayout(true);
+            centerPanel.add(splitPane, BorderLayout.CENTER);
+        } else return;
+        setCurrentCodeTextPane(openCodeTextPanes.get(0));
+        revalidate();
+        repaint();
     }
 
     public void openTerminal() {
@@ -295,7 +392,7 @@ public class MainFrame extends JFrame implements DirectoryPanel.FileSelectionLis
             String command = "";
             File currentFile = getCurrentCodeTextPane() != null ? getCurrentCodeTextPane().getFile() : new File(System.getProperty("user.home"));
             String workingDirectory = currentFile.isDirectory() ? currentFile.getAbsolutePath() : currentFile.getParentFile().getAbsolutePath();
-    
+
             if (os.contains("win")) {
                 command = "cmd.exe /c start cmd.exe /K \"cd /d " + workingDirectory + "\"";
             } else if (os.contains("nix") || os.contains("nux") || os.contains("mac")) {
@@ -304,11 +401,69 @@ public class MainFrame extends JFrame implements DirectoryPanel.FileSelectionLis
                 JOptionPane.showMessageDialog(this, "Unsupported OS for opening terminal.", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-    
+
             Runtime.getRuntime().exec(command);
         } catch (IOException ex) {
             ex.printStackTrace();
             JOptionPane.showMessageDialog(this, "Failed to open terminal.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    public void setCurrentCodeTextPane(CodeTextPane c) {
+        currentCodeTextPane = c;
+    }
+
+    private void runCurrentCode() {
+        if (currentCodeTextPane == null || currentCodeTextPane.getFile() == null) {
+            JOptionPane.showMessageDialog(this, "No file is open to compile and run.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+    
+        File file = currentCodeTextPane.getFile();
+        if (!file.getName().endsWith(".cpp")) {
+            JOptionPane.showMessageDialog(this, "The open file is not a C++ source file.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+    
+        String fileNameWithoutExtension = file.getName().replaceFirst("[.][^.]+$", "");
+        String inputFilePath = config.getProperty("input.file");
+        String outputFilePath = config.getProperty("output.file");
+        
+        // Adjust paths for the current operating system
+        String command;
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("win")) {
+            command = String.format("cmd.exe /c g++ \"%s\" -o \"%s.exe\" && .\\%s.exe < \"%s\" > \"%s\"", 
+                                    file.getAbsolutePath(), 
+                                    fileNameWithoutExtension, 
+                                    fileNameWithoutExtension, 
+                                    inputFilePath, 
+                                    outputFilePath);
+        } else {
+            command = String.format("g++ \"%s\" -o \"%s\" && ./%s < \"%s\" > \"%s\"", 
+                                    file.getAbsolutePath(), 
+                                    fileNameWithoutExtension, 
+                                    fileNameWithoutExtension, 
+                                    inputFilePath, 
+                                    outputFilePath);
+        }
+    
+        try {
+            System.out.println("dbg");
+            Process process = Runtime.getRuntime().exec(command);
+            new Thread(() -> {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        System.out.println(line); // Optionally print the output to console
+                    }
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }).start();
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Failed to compile or run the code.", "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 

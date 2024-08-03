@@ -30,13 +30,14 @@ public class CodeTextPane extends JTextPane {
         Properties config = loadConfig();
         String fontName = config.getProperty("font", "Menlo");
         int fontSize = Integer.parseInt(config.getProperty("font.size", "16"));
-        Color textColor = Color.decode(config.getProperty("default.text.color", "0xffffff"));
+        Color textColor = Color.decode(config.getProperty("textpane.foreground.color", "0xffffff"));
         Color backgroundColor = Color.decode(config.getProperty("textpane.background.color", "0x000847"));
+        Color caretColor = Color.decode(config.getProperty("caret.color", "0x000847"));
 
         setBackground(backgroundColor);
         setForeground(textColor);
         setFont(new Font(fontName, Font.PLAIN, fontSize));
-        setCaretColor(textColor);
+        setCaretColor(caretColor);
         setMargin(new Insets(16, 16, 8, 8));
         setCustomTabSize(TAB_SIZE);
         undoManager = new UndoManager();
@@ -64,7 +65,7 @@ public class CodeTextPane extends JTextPane {
             @Override
             public void keyPressed(KeyEvent e) {
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-                    SwingUtilities.invokeLater(() -> handleEnterKey());
+                    SwingUtilities.invokeLater (() -> handleEnterKey());
                 }
             }
         });
@@ -98,7 +99,7 @@ public class CodeTextPane extends JTextPane {
         //     @Override
         //     public void actionPerformed(ActionEvent e) {
         //         if (undoManager.canUndo()) {
-        //             undoManager.undo();
+        //             SwingUtilities.invokeLater(() -> undoManager.undo());
         //         }
         //     }
         // });
@@ -108,12 +109,45 @@ public class CodeTextPane extends JTextPane {
         //     @Override
         //     public void actionPerformed(ActionEvent e) {
         //         if (undoManager.canRedo()) {
-        //             undoManager.redo();
+        //             SwingUtilities.invokeLater(() -> undoManager.redo());
         //         }
         //     }
         // });
 
+        KeyStroke f5 = KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0);
+        getInputMap().put(f5, "reopen");
+        getActionMap().put("reopen", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                SwingUtilities.invokeLater(() -> reopen());
+            }
+        });
+
     }
+
+    public void reopen() {
+        if (file != null) {
+            try (FileInputStream fis = new FileInputStream(file)) {
+                byte[] data = new byte[(int) file.length()];
+                fis.read(data);
+                String content = new String(data, "UTF-8");
+                setText(content);
+                SyntaxHighlighter.highlightAll(this);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public void makeFocusable(MainFrame mainFrame) {
+        this.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                mainFrame.setCurrentCodeTextPane(CodeTextPane.this);
+            }
+        });
+    }
+
     private Properties loadConfig() {
         Properties config = new Properties();
         try (FileInputStream input = new FileInputStream("config.properties")) {
@@ -125,7 +159,7 @@ public class CodeTextPane extends JTextPane {
     }
     public void setCustomTabSize(int tabSize) {
         FontMetrics fm = getFontMetrics(getFont());
-        int charWidth = fm.charWidth('m'); // Width of a single character (m is usually one of the widest)
+        int charWidth = fm.charWidth('m'); 
         int tabWidth = charWidth * tabSize;
 
         TabStop[] tabs = new TabStop[10];
@@ -194,28 +228,26 @@ public class CodeTextPane extends JTextPane {
 
         if (isBetweenPairs(getCaretPosition())) {
             try {
-                int indentLevel = getStartOfLineAbove(getCaretPosition());
-                ++indentLevel;
+                int indentLevel = getAboveOffset(getCaretPosition());
                 StringBuilder indentation = new StringBuilder();
-                for (int i = 0; i < TAB_SIZE * indentLevel; i++) {
-                    indentation.append(' ');
+                for (int i = 0; i < indentLevel+1; i++) {
+                    indentation.append('\t');
                 }
                 indentation.append('\n');
-                --indentLevel;
-                for (int i = 0; i < TAB_SIZE * indentLevel; i++) {
-                    indentation.append(' ');
+                for (int i = 0; i < indentLevel; i++) {
+                    indentation.append('\t');
                 }
                 doc.insertString(getCaretPosition(), indentation.toString(), null);
-                setCaretPosition(getCaretPosition() - (indentLevel * TAB_SIZE) - 1);
+                setCaretPosition(getCaretPosition() - indentLevel - 1);
             } catch (BadLocationException ex) {
                 ex.printStackTrace();
             }
         } else {
             try {
-                int indentLevel = getStartOfLineAbove(getCaretPosition());
+                int indentLevel = getAboveOffset(getCaretPosition());
                 StringBuilder indentation = new StringBuilder();
-                for (int i = 0; i < TAB_SIZE * indentLevel; i++) {
-                    indentation.append(' ');
+                for (int i = 0; i < indentLevel; i++) {
+                    indentation.append('\t');
                 }
                 doc.insertString(getCaretPosition(), indentation.toString(), null);
             } catch (Exception ex) {
@@ -239,7 +271,7 @@ public class CodeTextPane extends JTextPane {
         return textBefore.equals("(") || textBefore.equals("[") || textBefore.equals("{");
     }
 
-    private int getStartOfLineAbove(int caretPosition) {
+    private int getAboveOffset(int caretPosition) {
         try {
             int lineIndex = getStyledDocument().getDefaultRootElement().getElementIndex(caretPosition);
             if (--lineIndex >= 0) {

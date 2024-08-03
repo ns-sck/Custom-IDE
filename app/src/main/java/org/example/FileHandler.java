@@ -27,17 +27,17 @@ public class FileHandler {
 
     // Method to save current text to file
     public void saveToFile() {
-        CodeTextArea currentTextArea = mainFrame.getCurrentCodeTextArea();
-        if (currentTextArea == null) {
+        CodeTextPane currentTextPane = mainFrame.getCurrentCodeTextPane();
+        if (currentTextPane == null) {
             JOptionPane.showMessageDialog(mainFrame, "No file is currently open.", "Save Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
-        File currentFile = currentTextArea.getFile();
+        File currentFile = currentTextPane.getFile();
         if (currentFile == null) {
             saveAs();
         } else {
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(currentFile))) {
-                writer.write(currentTextArea.getText());
+                writer.write(currentTextPane.getText());
             } catch (IOException ex) {
                 ex.printStackTrace();
                 JOptionPane.showMessageDialog(mainFrame, "Error saving file: " + currentFile.getName(), "File Save Error", JOptionPane.ERROR_MESSAGE);
@@ -47,8 +47,8 @@ public class FileHandler {
 
     // Method to save text to a new file
     public void saveAs() {
-        CodeTextArea currentTextArea = mainFrame.getCurrentCodeTextArea();
-        if (currentTextArea == null) {
+        CodeTextPane currentTextPane = mainFrame.getCurrentCodeTextPane();
+        if (currentTextPane == null) {
             JOptionPane.showMessageDialog(mainFrame, "No file is currently open.", "Save Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
@@ -57,8 +57,8 @@ public class FileHandler {
         if (userChoice == JFileChooser.APPROVE_OPTION) {
             File selectedFile = fileChooser.getSelectedFile();
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(selectedFile))) {
-                writer.write(currentTextArea.getText());
-                currentTextArea.setFile(selectedFile); // Associate the file with the current tab
+                writer.write(currentTextPane.getText());
+                currentTextPane.setFile(selectedFile); // Associate the file with the current tab
             } catch (IOException ex) {
                 ex.printStackTrace();
                 JOptionPane.showMessageDialog(mainFrame, "Error saving file: " + selectedFile.getName(), "File Save Error", JOptionPane.ERROR_MESSAGE);

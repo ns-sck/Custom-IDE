@@ -15,15 +15,17 @@ public class BottomPanel extends JPanel {
     private static String utilityDirectory;
     private static File inputFile;
     private static File outputFile;
+    private static Color bg;
 
     public static JPanel createBottomPanel(MainFrame mainFrame) {
         Properties config = loadConfig();
         utilityDirectory = config.getProperty("utility.directory", "C:");
         inputFile = new File(config.getProperty("input.file", "C:"));
         outputFile = new File(config.getProperty("output.file", "C:"));
+        bg = Color.decode(config.getProperty("bottom.panel.color", "C:"));
 
         panel = new JPanel(new FlowLayout());
-        panel.setBackground(Color.BLACK);
+        panel.setBackground(bg);
         JButton directoryButton = createButton("Directories", mainFrame);
         JButton terminalButton = createButton("Terminal", mainFrame);
         JButton templatesButton = createButton("Templates", mainFrame);

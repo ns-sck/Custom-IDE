@@ -42,7 +42,7 @@ public class SyntaxHighlighter {
             "int", "string", "for", "while", "include", "define", "long long", "return",
             "priority_queue", "queue", "stack", "map", "unordered_map", "set", "unordered_set",
             "multiset", "unordered_multiset", "multimap", "unordered_multimap", "insert", "push_back",
-            "pop_back", "front", "back"
+            "pop_back", "front", "back", "using", "namespace", "template", "typename"
         };
         for (String keyword : cppKeywords) {
             KEYWORDS.put(keyword, new Color(0x00ff37));
@@ -60,6 +60,11 @@ public class SyntaxHighlighter {
         SwingUtilities.invokeLater(() -> {
             try {
 
+                Properties config = loadConfig();
+                keywordColor = Color.decode(config.getProperty("keyword.color", "0x00fffb"));
+                symbolColor = Color.decode(config.getProperty("symbol.color", "0x00fffb"));
+                numberColor = Color.decode(config.getProperty("number.color", "0x00fffb"));
+                
                 textPane.trackingEnabled = false;
                 String text = textPane.getText();
                 StyledDocument doc = textPane.getStyledDocument();
@@ -88,7 +93,7 @@ public class SyntaxHighlighter {
                     }
                 }
 
-                String[] symbols = {"{", "}", "[", "]", "(", ")", "#", "<", ">", "'", "\""};{}
+                String[] symbols = {"{", "}", "[", "]", "(", ")", "#", "<", ">", "'", "\"", "=", "|", "&", "^"};{}
                 for (String symbol : symbols) {
                     Pattern pattern = Pattern.compile(Pattern.quote(symbol));
                     Matcher matcher = pattern.matcher(text);
